@@ -4,20 +4,22 @@
 
 import 'dart:io';
 
-import 'package:firebase_app_installations/firebase_app_installations.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
+
+late UserCredential user;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  user = await FirebaseAuth.instance.signInAnonymously();
+
   runApp(const MyApp());
 }
 
@@ -44,6 +46,8 @@ class MyHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const username = 'test@example222.com';
+    const password = '123456789';
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
@@ -53,33 +57,31 @@ class MyHomePage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             ElevatedButton(
+              onPressed: () {
+                FirebaseAuth.instance.createUserWithEmailAndPassword(
+                  email: username,
+                  password: password,
+                );
+              },
+              child: Text('create an user'),
+            ),
+            ElevatedButton(
               onPressed: () async {
-                // Running these APIs manually as they're failing on CI due to required keychain sharing entitlements
-                // See this issue https://github.com/firebase/flutterfire/issues/9538
-                // You will also need to add the keychain sharing entitlements to this test app and sign code with development team for app & tests to successfully run
-                if (Platform.isMacOS && kDebugMode) {
-                  // ignore_for_file: avoid_print
-                  await FirebaseRemoteConfig.instance.fetchAndActivate();
-                  print('Fetched and activated remote config');
+                final user = await FirebaseAuth.instance
+                    .signInWithEmailAndPassword(
+                        email: username, password: password);
+                print(user);
+              },
+              child: Text('login'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (Platform.isIOS && kDebugMode) {
+                  final user = FirebaseAuth.instance.currentUser;
+                  final idToken = await user?.getIdTokenResult();
 
-                  final id = await FirebaseInstallations.instance.getId();
-                  print('Received Firebase App Installations id: $id');
-
-                  // Wait a little so we don't get a delete-pending exception
-                  await Future.delayed(const Duration(seconds: 8));
-
-                  await FirebaseInstallations.instance.delete();
-                  print('Deleted Firebase App Installations id');
-
-                  final token = await FirebaseInstallations.instance.getToken();
-                  print('Received Firebase App Installations token: $token');
-
-                  const topic = 'test-topic';
-                  await FirebaseMessaging.instance.subscribeToTopic(topic);
-                  print('Firebase Messaging subscribed to topic: $topic');
-
-                  await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
-                  print('Firebase Messaging unsubscribed to topic: $topic');
+                  print(user);
+                  print(idToken);
                 }
               },
               child: const Text('Test macOS tests manually'),
